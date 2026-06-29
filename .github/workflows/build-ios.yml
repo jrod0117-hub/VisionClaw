@@ -67,24 +67,13 @@ jobs:
             -target CameraAccess \
             -configuration Debug \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             ENABLE_BITCODE=NO \
+            ONLY_ACTIVE_ARCH=NO \
             build \
-            | tee build.log \
-            | xcbeautify --renderer github-actions || \
-          xcodebuild \
-            -project CameraAccess.xcodeproj \
-            -target CameraAccess \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            ENABLE_BITCODE=NO \
-            build
+            2>&1 | tee build.log; exit ${PIPESTATUS[0]}
 
       - name: Find built .app
         if: always()
