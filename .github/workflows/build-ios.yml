@@ -13,14 +13,14 @@ on:
 jobs:
   build:
     name: xcodebuild (no signing)
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode_15.3.app || true
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app
 
       - name: Show SDKs
         run: xcodebuild -showsdks
@@ -74,6 +74,10 @@ jobs:
             ONLY_ACTIVE_ARCH=NO \
             SUPPORTED_PLATFORMS=iphoneos \
             TARGETED_DEVICE_FAMILY=1 \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ASSETCATALOG_COMPILER_SKIP_APP_STORE_DEPLOYMENT=YES \
+            SKIP_INSTALL=YES \
+            ENABLE_PREVIEWS=NO \
             build \
             2>&1 | tee build.log; exit ${PIPESTATUS[0]}
 
