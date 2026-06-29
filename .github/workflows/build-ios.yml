@@ -1,0 +1,101 @@
+name: Build VisionClaw iOS
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'samples/CameraAccess/**'
+      - '.github/workflows/build-ios.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: xcodebuild (no signing)
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app
+
+      - name: Show SDKs
+        run: xcodebuild -showsdks
+
+      # Inject Secrets.swift from GitHub secrets (never commit real values)
+      - name: Inject Secrets.swift
+        env:
+          HERMES_HOST:         ${{ secrets.HERMES_HOST }}
+          HERMES_WS_PORT:      ${{ secrets.HERMES_WS_PORT }}
+          HERMES_HTTP_PORT:    ${{ secrets.HERMES_HTTP_PORT }}
+          OPENCLAW_HOST:       ${{ secrets.OPENCLAW_HOST }}
+          OPENCLAW_PORT:       ${{ secrets.OPENCLAW_PORT }}
+          OPENCLAW_TOKEN:      ${{ secrets.OPENCLAW_TOKEN }}
+        run: |
+          cat > samples/CameraAccess/CameraAccess/Secrets.swift <<EOF
+          import Foundation
+          enum Secrets {
+              static let hermesHost         = "${HERMES_HOST:-jrod0.tail097ee0.ts.net}"
+              static let hermesWsPort       = ${HERMES_WS_PORT:-8767}
+              static let hermesHttpPort     = ${HERMES_HTTP_PORT:-8768}
+              static let openClawHost       = "${OPENCLAW_HOST:-http://jrod0.tail097ee0.ts.net}"
+              static let openClawPort       = ${OPENCLAW_PORT:-18789}
+              static let openClawGatewayToken = "${OPENCLAW_TOKEN:-visionclaw2026token}"
+              static let openClawHookToken  = ""
+              static let webrtcSignalingURL = ""
+              static let geminiAPIKey       = ""
+          }
+          EOF
+
+      - name: Resolve Swift Packages
+        working-directory: samples/CameraAccess
+        run: |
+          xcodebuild \
+            -project CameraAccess.xcodeproj \
+            -resolvePackageDependencies \
+            -clonedSourcePackagesDirPath .spm-cache \
+            || true   # non-fatal — target build will re-resolve if needed
+
+      - name: Build (no code signing)
+        working-directory: samples/CameraAccess
+        run: |
+          xcodebuild \
+            -project CameraAccess.xcodeproj \
+            -target CameraAccess \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO \
+            build \
+            | tee build.log \
+            | xcbeautify --renderer github-actions || \
+          xcodebuild \
+            -project CameraAccess.xcodeproj \
+            -target CameraAccess \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO \
+            build
+
+      - name: Find built .app
+        if: always()
+        run: |
+          find ~/Library/Developer/Xcode/DerivedData -name "CameraAccess.app" 2>/dev/null | head -5 || echo "No .app found in DerivedData"
+          find . -name "CameraAccess.app" 2>/dev/null | head -5 || true
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: samples/CameraAccess/build.log
+          if-no-files-found: ignore
